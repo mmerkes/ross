@@ -1,18 +1,27 @@
-use actix_web::{delete, get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{delete, error, get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_web::error::HttpError;
 use clap::Parser;
 use env_logger::Env;
-use log::{info};
+use log::info;
 use ross::local_storage;
+use serde::Deserialize;
 
 #[get("")]
 async fn get_stores() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
+#[derive(Deserialize)]
+struct Store {
+    id: String,
+}
+
 #[post("")]
-async fn create_store(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body("foo")
+async fn create_store(store: web::Json<Store>, data: web::Data<local_storage::Storage>) -> Result<(), error::Error> {
+    match data.add(store.id.clone()) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(error::ErrorServiceUnavailable(e)),
+    }
 }
 
 #[get("/{store_id}")]
@@ -43,11 +52,12 @@ async fn main() -> std::io::Result<()> {
     let cli = RossServerCli::parse();
     info!("Using {0} as the root directory.", cli.root_dir);
 
-    let storage = local_storage::load(&cli.root_dir)?;
+    let storage = local_storage::Storage::load(&cli.root_dir)?;
     info!("Storage: {:?}", storage);
 
-    HttpServer::new(|| {
+    HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(storage.clone()))
             .service(web::scope("/stores")
                      .service(get_stores)
                      .service(create_store)

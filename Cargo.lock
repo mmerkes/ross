@@ -1174,6 +1174,7 @@ dependencies = [
  "clap",
  "env_logger",
  "log",
+ "serde",
 ]
 
 [[package]]
